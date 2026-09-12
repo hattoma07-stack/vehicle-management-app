@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>車両管理アプリ</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --border:#e2e5ea; --text:#1f2430; --sub:#6b7280;
+    --accent:#2563eb; --accent-dark:#1d4ed8; --danger:#dc2626; --warn:#d97706; --ok:#059669;
+    --row-hover:#f1f5f9; --header-h:65px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);}
+  header{background:var(--panel);border-bottom:1px solid var(--border);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;position:sticky;top:0;z-index:30;box-shadow:0 1px 0 rgba(0,0,0,.02);}
+  header h1{font-size:18px;margin:0;font-weight:700;}
+  header .sub{font-size:12px;color:var(--sub);margin-top:2px;}
+  main{max-width:1180px;margin:0 auto;padding:20px 24px 60px;}
+  .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px;}
+  .toolbar .spacer{flex:1;}
+  input[type=text], input[type=search]{padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:#fff;}
+  select{padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:#fff;}
+  button{cursor:pointer;border:none;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:600;transition:opacity .15s;}
+  button:hover{opacity:.85;}
+  button:active{opacity:.7;}
+  button:disabled{opacity:.5;cursor:default;}
+  .btn-primary{background:var(--accent);color:#fff;}
+  .btn-secondary{background:#fff;color:var(--text);border:1px solid var(--border);}
+  .btn-danger{background:#fff;color:var(--danger);border:1px solid #fecaca;}
+  .btn-ghost{background:transparent;color:var(--sub);}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+  .table-scroll{overflow:auto;max-height:calc(100vh - 320px);min-height:200px;}
+  table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:12px;}
+  thead th{text-align:left;background:#fafbfc;color:var(--sub);font-weight:600;padding:8px 6px;border-bottom:1px solid var(--border);white-space:normal;word-break:break-word;line-height:1.3;font-size:11px;position:sticky;top:0;z-index:10;box-shadow:0 1px 0 var(--border);}
+  tbody td{padding:6px;border-bottom:1px solid var(--border);vertical-align:top;overflow:hidden;}
+  tbody tr:hover{background:var(--row-hover);}
+  tbody tr:last-child td{border-bottom:none;}
+  .badge{display:inline-block;padding:2px 6px;border-radius:999px;font-size:10px;font-weight:700;white-space:normal;line-height:1.3;}
+  .badge-danger{background:#fee2e2;color:var(--danger);}
+  .badge-warn{background:#fef3c7;color:var(--warn);}
+  .badge-ok{background:#d1fae5;color:var(--ok);}
+  .badge-muted{background:#f1f5f9;color:var(--sub);}
+  .actions-cell{white-space:nowrap;padding-left:4px;padding-right:4px;}
+  .actions-cell button{padding:4px 6px;font-size:12px;margin-right:2px;min-width:0;}
+  .move-btn{padding:4px 6px;font-size:11px;background:#fff;color:var(--text);border:1px solid var(--border);}
+  .move-btn:disabled{opacity:.3;cursor:default;}
+  .move-btn:disabled:hover{opacity:.3;}
+  .empty{padding:60px 20px;text-align:center;color:var(--sub);}
+  .cell-input{width:100%;box-sizing:border-box;padding:5px 5px;border:1px solid transparent;border-radius:6px;font-size:12px;font-family:inherit;background:transparent;color:inherit;overflow:hidden;text-overflow:ellipsis;}
+  .cell-input:hover{border-color:var(--border);background:#fff;}
+  .cell-input:focus{border-color:var(--accent);background:#fff;outline:none;box-shadow:0 0 0 3px rgba(37,99,235,.12);}
+  input[type=date].cell-input{padding-left:3px;padding-right:2px;font-size:11px;}
+  .stack-col{display:flex;flex-direction:column;gap:3px;min-width:0;}
+  .stack-col .badge{width:fit-content;max-width:100%;}
+  .new-row{animation:flash 1s ease;}
+  @keyframes flash{0%{background:#dbeafe;}100%{background:transparent;}}
+  .office-card{padding:16px 18px;margin-bottom:16px;}
+  .office-add-row{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+  .office-add-row input{flex:1;min-width:180px;}
+  .office-counts{display:flex;flex-wrap:wrap;gap:8px;}
+  .office-chip{display:inline-flex;align-items:center;gap:6px;background:#f6f7f9;border:1px solid var(--border);border-radius:999px;padding:6px 10px 6px 12px;font-size:12px;color:var(--text);}
+  .office-chip .count{font-weight:700;color:var(--accent);}
+  .office-chip .remove-office-btn{background:none;border:none;color:var(--sub);cursor:pointer;padding:0 2px;font-size:14px;line-height:1;border-radius:4px;}
+  .office-chip .remove-office-btn:hover{color:var(--danger);opacity:1;background:#fee2e2;}
+  .stat-row{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+  .stat{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 18px;min-width:140px;}
+  .stat .num{font-size:22px;font-weight:800;}
+  .stat .label{font-size:12px;color:var(--sub);margin-top:2px;}
+  .hint{font-size:11px;color:var(--sub);margin-top:14px;line-height:1.6;}
+  footer{text-align:center;color:var(--sub);font-size:11px;padding:20px;}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1f2430;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:200;opacity:0;pointer-events:none;transition:opacity .2s, transform .2s;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px);}
+  .toast.toast-error{background:var(--danger);}
+  .sync-status{font-size:11px;color:var(--sub);display:flex;align-items:center;gap:6px;}
+  .sync-dot{width:8px;height:8px;border-radius:50%;background:var(--sub);flex:none;}
+  .sync-dot.ok{background:var(--ok);}
+  .sync-dot.busy{background:var(--warn);animation:pulse 1s infinite;}
+  .sync-dot.error{background:var(--danger);}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+  .modal-overlay{position:fixed;inset:0;background:rgba(15,18,25,.45);display:flex;align-items:center;justify-content:center;z-index:300;padding:20px;}
+  .modal-overlay[hidden]{display:none;}
+  .modal{background:var(--panel);border-radius:14px;padding:24px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+  .modal h2{margin:0 0 8px;font-size:16px;}
+  .modal p{font-size:12px;color:var(--sub);line-height:1.7;margin:0 0 16px;}
+  .modal label{display:block;font-size:12px;font-weight:600;margin:12px 0 6px;}
+  .modal input[type=text]{width:100%;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;}
+  .disabled-overlay{padding:60px 20px;text-align:center;color:var(--sub);}
+  @media (max-width:700px){
+    .form-grid{grid-template-columns:1fr;}
+    table{font-size:12px;}
+    thead th, tbody td{padding:8px;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🚗 車両管理アプリ</h1>
+    <div class="sub">事業所・車種・ナンバー・所有者名義・購入年月日・車検・リース満了日・タイヤサイズを一元管理（データはGoogleスプレッドシートで共有保存）</div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+    <span class="sync-status" id="syncStatus"><span class="sync-dot" id="syncDot"></span><span id="syncLabel">未接続</span></span>
+    <button class="btn-secondary" id="btnReload">🔄 再読み込み</button>
+    <button class="btn-secondary" id="btnExportJson">⭳ データ出力 (JSON)</button>
+    <button class="btn-secondary" id="btnExportCsv">⭳ CSV出力</button>
+    <button class="btn-secondary" id="btnSettings">⚙ 接続設定</button>
+    <button class="btn-primary" id="btnAdd">＋ 車両を追加</button>
+  </div>
+</header>
+
+<main>
+  <div class="stat-row" id="statRow"></div>
+
+  <div class="card office-card">
+    <div class="office-add-row">
+      <input type="text" id="newOfficeInput" placeholder="新しい事業所名を入力">
+      <button class="btn-primary" id="btnAddOffice">＋ 事業所を追加</button>
+    </div>
+    <div id="officeCounts" class="office-counts"></div>
+  </div>
+
+  <div class="toolbar">
+    <input type="search" id="searchBox" placeholder="事業所・車種・ナンバーで検索">
+    <select id="filterOffice"><option value="">すべての事業所</option></select>
+    <div class="spacer"></div>
+    <span style="font-size:12px;color:var(--sub);" id="countLabel"></span>
+  </div>
+
+  <div class="card">
+    <div class="table-scroll">
+      <table id="vehicleTable">
+        <colgroup>
+          <col style="width:10%">
+          <col style="width:9%">
+          <col style="width:9%">
+          <col style="width:8%">
+          <col style="width:10%">
+          <col style="width:9%">
+          <col style="width:10%">
+          <col style="width:10%">
+          <col style="width:6.5%">
+          <col style="width:6.5%">
+          <col style="width:5%">
+          <col style="width:7%">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>事業所</th>
+            <th>車種</th>
+            <th>ナンバー</th>
+            <th>所有者名義</th>
+            <th>初年度登録</th>
+            <th>購入年月日</th>
+            <th>次回車検</th>
+            <th>リース満了日</th>
+            <th>夏タイヤサイズ</th>
+            <th>スタッドレスタイヤサイズ</th>
+            <th>備考</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="emptyState" style="display:none;">該当する車両がありません</div>
+  </div>
+
+  <div class="hint">
+    ※ このアプリのデータは、あなたが設定したGoogleスプレッドシート（Google Apps Script経由）に保存されます。同じ接続設定（URL・合言葉）を使う端末同士でリアルタイムにデータを共有できます。<br>
+    ※ 上部の「事業所を追加」から、車両がまだ無い事業所も先に登録できます（絞り込み・入力候補にすぐ反映されます）。事業所ごとの車両台数も同じ欄で確認できます。<br>
+    ※ 初年度登録の下には登録からの経過年数を自動表示します（10年以上は黄、15年以上は赤で表示）。<br>
+    ※ リース満了日は所有者名義が「CENTO ANNI」の車両でのみ有効です（自社所有＝清流会名義の車両は「自社所有」と表示され、満了アラートの対象外になります）。<br>
+    ※ 各行の▲▼ボタンで表示順を上下に入れ替えられます（検索・絞り込み中はその範囲内での並び替えになります）。<br>
+    ※ 表の各セルをクリックすると直接編集できます（セルを離れると自動的にスプレッドシートへ保存されます）。<br>
+    ※ 他の人が編集した内容を取り込むには「🔄 再読み込み」を押してください（起動時は自動で最新を取得します）。<br>
+    ※「データ出力 (JSON)」「CSV出力」は、その時点の内容をバックアップとして手元に保存するためのものです（読み込み直接は行いません。復元が必要な場合はスプレッドシートを直接編集してください）。
+  </div>
+</main>
+
+<footer>車両管理アプリ / 最終更新: <span id="footerDate"></span></footer>
+
+<datalist id="officeList"></datalist>
+<datalist id="ownerList">
+  <option value="清流会">
+  <option value="CENTO ANNI">
+</datalist>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="settingsOverlay" hidden>
+  <div class="modal">
+    <h2>⚙ 接続設定（Google Apps Script）</h2>
+    <p>
+      車両データを保存するGoogle Apps ScriptのウェブアプリURLと合言葉（トークン）を入力してください。
+      GoogleスプレッドシートにApps Scriptを設定してデプロイする手順は、同梱の
+      <code>GoogleAppsScript_Code.gs</code> と <code>README.md</code> を参照してください。
+      入力内容はこの端末のブラウザにのみ保存されます。
+    </p>
+    <label for="settingsUrl">ウェブアプリURL（.../exec）</label>
+    <input type="text" id="settingsUrl" placeholder="https://script.google.com/macros/s/xxxxx/exec">
+    <label for="settingsToken">合言葉（トークン）</label>
+    <input type="text" id="settingsToken" placeholder="Code.gs の API_TOKEN と同じ値">
+    <div class="modal-actions">
+      <button class="btn-ghost" id="btnSettingsCancel">キャンセル</button>
+      <button class="btn-primary" id="btnSettingsSave">保存して接続</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var STORAGE_KEY = "vehicleApp.connection";
+
+  var data = [];
+  var manualOffices = [];
+  var justAddedId = null;
+  var conn = { url: "", token: "" };
+
+  var el = {
+    tbody: document.getElementById('tbody'),
+    emptyState: document.getElementById('emptyState'),
+    statRow: document.getElementById('statRow'),
+    searchBox: document.getElementById('searchBox'),
+    filterOffice: document.getElementById('filterOffice'),
+    countLabel: document.getElementById('countLabel'),
+    officeList: document.getElementById('officeList'),
+    officeCounts: document.getElementById('officeCounts'),
+    newOfficeInput: document.getElementById('newOfficeInput'),
+    toast: document.getElementById('toast'),
+    footerDate: document.getElementById('footerDate'),
+    syncDot: document.getElementById('syncDot'),
+    syncLabel: document.getElementById('syncLabel'),
+    settingsOverlay: document.getElementById('settingsOverlay'),
+    settingsUrl: document.getElementById('settingsUrl'),
+    settingsToken: document.getElementById('settingsToken')
+  };
+
+  function todayISO(){
+    var d = new Date();
+    return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,'0')+"-"+String(d.getDate()).padStart(2,'0');
+  }
+  el.footerDate.textContent = todayISO();
+
+  // ---- connection settings (stored locally per-browser) ----
+  function loadConnection(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        var obj = JSON.parse(raw);
+        conn.url = obj.url || "";
+        conn.token = obj.token || "";
+      }
+    }catch(err){ /* ignore malformed storage */ }
+  }
+  function saveConnection(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(conn)); }catch(err){ /* storage unavailable */ }
+  }
+  function isConfigured(){
+    return !!(conn.url && conn.token);
+  }
+
+  function openSettings(){
+    el.settingsUrl.value = conn.url;
+    el.settingsToken.value = conn.token;
+    el.settingsOverlay.hidden = false;
+  }
+  function closeSettings(){
+    el.settingsOverlay.hidden = true;
+  }
+
+  document.getElementById('btnSettings').addEventListener('click', openSettings);
+  document.getElementById('btnSettingsCancel').addEventListener('click', closeSettings);
+  document.getElementById('btnSettingsSave').addEventListener('click', function(){
+    var url = el.settingsUrl.value.trim();
+    var token = el.settingsToken.value.trim();
+    if(!url || !token){ showToast("URLと合言葉の両方を入力してください", true); return; }
+    conn.url = url; conn.token = token;
+    saveConnection();
+    closeSettings();
+    loadFromServer();
+  });
+
+  // ---- sync status indicator ----
+  function setSyncStatus(state, label){
+    el.syncDot.className = "sync-dot" + (state ? " " + state : "");
+    el.syncLabel.textContent = label;
+  }
+
+  // ---- backend API ----
+  function apiGet(){
+    var url = conn.url + "?token=" + encodeURIComponent(conn.token) + "&action=list";
+    return fetch(url, { method: "GET" }).then(function(res){ return res.json(); });
+  }
+  function apiPost(action, payload){
+    return fetch(conn.url, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ token: conn.token, action: action, payload: payload || {} })
+    }).then(function(res){ return res.json(); });
+  }
+
+  function loadFromServer(){
+    if(!isConfigured()){
+      setSyncStatus("", "未接続（右上の「接続設定」から設定してください）");
+      data = [];
+      manualOffices = [];
+      render();
+      return;
+    }
+    setSyncStatus("busy", "読み込み中…");
+    apiGet().then(function(res){
+      if(!res || !res.ok){
+        setSyncStatus("error", "接続エラー: " + (res && res.error ? res.error : "unknown"));
+        showToast("スプレッドシートへの接続に失敗しました", true);
+        return;
+      }
+      data = res.vehicles || [];
+      manualOffices = res.offices || [];
+      setSyncStatus("ok", "接続済み（" + data.length + "件）");
+      render();
+    }).catch(function(err){
+      setSyncStatus("error", "接続エラー");
+      showToast("スプレッドシートへの接続に失敗しました: " + err.message, true);
+    });
+  }
+
+  function daysUntil(dateStr){
+    if(!dateStr) return null;
+    var target = new Date(dateStr + "T00:00:00");
+    var now = new Date();
+    now.setHours(0,0,0,0);
+    return Math.round((target - now) / 86400000);
+  }
+
+  function shakenBadge(dateStr){
+    if(!dateStr) return '<span class="badge badge-muted">未設定</span>';
+    var d = daysUntil(dateStr);
+    var label = dateStr;
+    if(d < 0) return '<span class="badge badge-danger">期限切れ ('+label+')</span>';
+    if(d <= 60) return '<span class="badge badge-warn">残り'+d+'日 ('+label+')</span>';
+    return '<span class="badge badge-ok">'+label+'</span>';
+  }
+
+  function elapsedYears(dateStr){
+    if(!dateStr) return null;
+    var d = new Date(dateStr + "T00:00:00");
+    var now = new Date();
+    now.setHours(0,0,0,0);
+    var years = now.getFullYear() - d.getFullYear();
+    var m = now.getMonth() - d.getMonth();
+    if(m < 0 || (m === 0 && now.getDate() < d.getDate())) years--;
+    return years;
+  }
+
+  function firstBadge(dateStr){
+    if(!dateStr) return '<span class="badge badge-muted">—</span>';
+    var y = elapsedYears(dateStr);
+    if(y < 0) y = 0;
+    var tone = y >= 15 ? "badge-danger" : (y >= 10 ? "badge-warn" : "badge-muted");
+    return '<span class="badge '+tone+'">経過'+y+'年</span>';
+  }
+
+  function isLeaseOwner(owner){
+    return /cento\s*anni/i.test(String(owner || ""));
+  }
+
+  function leaseBadge(dateStr, owner){
+    if(!isLeaseOwner(owner)) return '<span class="badge badge-muted">自社所有</span>';
+    if(!dateStr) return '<span class="badge badge-muted">未設定</span>';
+    var d = daysUntil(dateStr);
+    var label = dateStr;
+    if(d < 0) return '<span class="badge badge-danger">満了済 ('+label+')</span>';
+    if(d <= 90) return '<span class="badge badge-warn">残り'+d+'日 ('+label+')</span>';
+    return '<span class="badge badge-ok">'+label+'</span>';
+  }
+
+  function escapeHtml(s){
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  function uniqueOffices(){
+    var set = {};
+    data.forEach(function(v){ if(v.office) set[v.office] = true; });
+    manualOffices.forEach(function(o){ if(o) set[o] = true; });
+    return Object.keys(set).sort();
+  }
+
+  function officeCounts(){
+    var counts = {};
+    uniqueOffices().forEach(function(o){ counts[o] = 0; });
+    data.forEach(function(v){ if(v.office) counts[v.office] = (counts[v.office] || 0) + 1; });
+    return counts;
+  }
+
+  function renderOfficeCounts(){
+    var counts = officeCounts();
+    var offices = Object.keys(counts).sort();
+    if(!offices.length){
+      el.officeCounts.innerHTML = '<span style="font-size:12px;color:var(--sub);">まだ事業所が登録されていません。上の欄から追加してください。</span>';
+      return;
+    }
+    el.officeCounts.innerHTML = offices.map(function(o){
+      var c = counts[o];
+      var removable = c === 0 && manualOffices.indexOf(o) >= 0;
+      return '<span class="office-chip">' + escapeHtml(o) + '　<span class="count">' + c + '台</span>' +
+        (removable ? '<button class="remove-office-btn" data-action="remove-office" data-office="'+escapeHtml(o)+'" title="この事業所を削除（車両なしのみ削除可）">×</button>' : '') +
+        '</span>';
+    }).join('');
+  }
+
+  function addOffice(){
+    if(!isConfigured()){ showToast("先に接続設定をしてください", true); return; }
+    var name = el.newOfficeInput.value.trim();
+    if(!name){ showToast("事業所名を入力してください", true); return; }
+    if(uniqueOffices().indexOf(name) >= 0){ showToast("その事業所は既に登録されています", true); return; }
+    apiPost("addOffice", { name: name }).then(function(res){
+      if(!res || !res.ok){ showToast("事業所の追加に失敗しました", true); return; }
+      manualOffices.push(name);
+      el.newOfficeInput.value = "";
+      render();
+      showToast("事業所「" + name + "」を追加しました");
+    }).catch(function(err){ showToast("通信エラー: " + err.message, true); });
+  }
+
+  function removeOffice(name){
+    apiPost("removeOffice", { name: name }).then(function(res){
+      if(!res || !res.ok){ showToast("事業所の削除に失敗しました", true); return; }
+      manualOffices = manualOffices.filter(function(o){ return o !== name; });
+      render();
+    }).catch(function(err){ showToast("通信エラー: " + err.message, true); });
+  }
+
+  function refreshOfficeOptions(){
+    var offices = uniqueOffices();
+    var currentFilter = el.filterOffice.value;
+    el.filterOffice.innerHTML = '<option value="">すべての事業所</option>' +
+      offices.map(function(o){ return '<option value="'+escapeHtml(o)+'">'+escapeHtml(o)+'</option>'; }).join('');
+    el.filterOffice.value = offices.indexOf(currentFilter) >= 0 ? currentFilter : "";
+    el.officeList.innerHTML = offices.map(function(o){ return '<option value="'+escapeHtml(o)+'">'; }).join('');
+  }
+
+  function renderStats(){
+    var total = data.length;
+    var expired = data.filter(function(v){ return v.shaken && daysUntil(v.shaken) < 0; }).length;
+    var soon = data.filter(function(v){ return v.shaken && daysUntil(v.shaken) >= 0 && daysUntil(v.shaken) <= 60; }).length;
+    var offices = uniqueOffices().length;
+    var leaseSoon = data.filter(function(v){ return isLeaseOwner(v.owner) && v.leaseEnd && daysUntil(v.leaseEnd) >= 0 && daysUntil(v.leaseEnd) <= 90; }).length;
+    var leaseExpired = data.filter(function(v){ return isLeaseOwner(v.owner) && v.leaseEnd && daysUntil(v.leaseEnd) < 0; }).length;
+    el.statRow.innerHTML =
+      stat(total, "登録車両数") +
+      stat(offices, "事業所数") +
+      stat(soon, "車検60日以内", soon > 0 ? "warn" : null) +
+      stat(expired, "車検切れ", expired > 0 ? "danger" : null) +
+      stat(leaseSoon, "リース満了90日以内", leaseSoon > 0 ? "warn" : null) +
+      stat(leaseExpired, "リース満了済", leaseExpired > 0 ? "danger" : null);
+  }
+  function stat(num, label, tone){
+    var color = tone === "danger" ? "var(--danger)" : (tone === "warn" ? "var(--warn)" : "var(--text)");
+    return '<div class="stat"><div class="num" style="color:'+color+'">'+num+'</div><div class="label">'+label+'</div></div>';
+  }
+
+  function getFilteredData(){
+    var q = el.searchBox.value.trim().toLowerCase();
+    var officeFilter = el.filterOffice.value;
+    return data.filter(function(v){
+      if(officeFilter && v.office !== officeFilter) return false;
+      if(!q) return true;
+      var hay = [v.office, v.type, v.plate, v.note].join(" ").toLowerCase();
+      return hay.indexOf(q) >= 0;
+    });
+  }
+
+  function render(){
+    refreshOfficeOptions();
+    renderStats();
+    renderOfficeCounts();
+
+    if(!isConfigured()){
+      el.tbody.innerHTML = "";
+      el.emptyState.style.display = "block";
+      el.emptyState.textContent = "右上の「⚙ 接続設定」からGoogleスプレッドシートの接続情報を入力してください";
+      el.countLabel.textContent = "";
+      return;
+    }
+
+    var rows = getFilteredData();
+
+    el.countLabel.textContent = rows.length + " / " + data.length + " 件";
+    el.emptyState.style.display = rows.length ? "none" : "block";
+    el.emptyState.textContent = "該当する車両がありません";
+
+    el.tbody.innerHTML = rows.map(function(v, i){
+      var rowClass = (v.id === justAddedId) ? ' class="new-row"' : '';
+      var isFirst = i === 0;
+      var isLast = i === rows.length - 1;
+      return '<tr data-id="'+v.id+'"'+rowClass+'>' +
+        '<td><input class="cell-input" type="text" data-field="office" data-id="'+v.id+'" value="'+escapeHtml(v.office)+'" title="'+escapeHtml(v.office)+'" list="officeList" placeholder="事業所"></td>' +
+        '<td><input class="cell-input" type="text" data-field="type" data-id="'+v.id+'" value="'+escapeHtml(v.type)+'" title="'+escapeHtml(v.type)+'" placeholder="車種"></td>' +
+        '<td class="plate-cell"><input class="cell-input" type="text" data-field="plate" data-id="'+v.id+'" value="'+escapeHtml((v.plate||"").replace(/\n/g," "))+'" title="'+escapeHtml((v.plate||"").replace(/\n/g," "))+'" placeholder="ナンバー"></td>' +
+        '<td class="owner-cell"><input class="cell-input" type="text" data-field="owner" data-id="'+v.id+'" value="'+escapeHtml(v.owner)+'" title="'+escapeHtml(v.owner)+'" list="ownerList" placeholder="所有者名義"></td>' +
+        '<td class="date-cell"><div class="stack-col">' +
+          '<input class="cell-input" type="date" data-field="first" data-id="'+v.id+'" value="'+escapeHtml(v.first)+'">' +
+          '<span class="first-badge-slot" data-first-badge-id="'+v.id+'">'+firstBadge(v.first)+'</span>' +
+        '</div></td>' +
+        '<td class="date-cell"><input class="cell-input" type="date" data-field="purchase" data-id="'+v.id+'" value="'+escapeHtml(v.purchase)+'"></td>' +
+        '<td class="shaken-cell"><div class="stack-col">' +
+          '<input class="cell-input" type="date" data-field="shaken" data-id="'+v.id+'" value="'+escapeHtml(v.shaken)+'">' +
+          '<span class="badge-slot" data-badge-id="'+v.id+'">'+shakenBadge(v.shaken)+'</span>' +
+        '</div></td>' +
+        '<td class="lease-cell"><div class="stack-col">' +
+          '<input class="cell-input" type="date" data-field="leaseEnd" data-id="'+v.id+'" value="'+escapeHtml(v.leaseEnd)+'">' +
+          '<span class="lease-badge-slot" data-lease-badge-id="'+v.id+'">'+leaseBadge(v.leaseEnd, v.owner)+'</span>' +
+        '</div></td>' +
+        '<td><input class="cell-input" type="text" data-field="summer" data-id="'+v.id+'" value="'+escapeHtml(v.summer)+'" placeholder="—"></td>' +
+        '<td><input class="cell-input" type="text" data-field="studless" data-id="'+v.id+'" value="'+escapeHtml(v.studless)+'" placeholder="—"></td>' +
+        '<td><input class="cell-input" type="text" data-field="note" data-id="'+v.id+'" value="'+escapeHtml(v.note)+'" placeholder="—"></td>' +
+        '<td class="actions-cell">' +
+          '<button class="move-btn" data-action="up" data-id="'+v.id+'" title="上へ移動"'+(isFirst?' disabled':'')+'>▲</button>' +
+          '<button class="move-btn" data-action="down" data-id="'+v.id+'" title="下へ移動"'+(isLast?' disabled':'')+'>▼</button>' +
+          '<button class="btn-danger" data-action="delete" data-id="'+v.id+'" title="削除">🗑</button>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+    justAddedId = null;
+  }
+
+  function findRecord(id){
+    return data.find(function(x){ return x.id === id; });
+  }
+
+  function commitFieldLocal(id, field, value){
+    var rec = findRecord(id);
+    if(!rec) return;
+    rec[field] = value;
+  }
+
+  function syncField(id, field, value){
+    apiPost("updateField", { id: id, field: field, value: value }).then(function(res){
+      if(!res || !res.ok){ showToast("保存に失敗しました（" + field + "）", true); }
+    }).catch(function(err){ showToast("通信エラー: " + err.message, true); });
+  }
+
+  function addVehicle(){
+    if(!isConfigured()){ showToast("先に接続設定をしてください", true); return; }
+    showToast("追加しています…");
+    apiPost("addVehicle", {}).then(function(res){
+      if(!res || !res.ok || !res.vehicle){ showToast("車両の追加に失敗しました", true); return; }
+      data.push(res.vehicle);
+      justAddedId = res.vehicle.id;
+      el.searchBox.value = "";
+      el.filterOffice.value = "";
+      render();
+      var firstInput = el.tbody.querySelector('input[data-field="office"][data-id="'+res.vehicle.id+'"]');
+      if(firstInput) firstInput.focus();
+      showToast("行を追加しました。セルに入力してください");
+    }).catch(function(err){ showToast("通信エラー: " + err.message, true); });
+  }
+
+  function deleteVehicle(id){
+    var rec = findRecord(id);
+    if(!rec) return;
+    var label = (rec.office || "") + " " + (rec.type || "") ;
+    if(!window.confirm(label.trim() + " を削除しますか？")) return;
+    apiPost("deleteVehicle", { id: id }).then(function(res){
+      if(!res || !res.ok){ showToast("削除に失敗しました", true); return; }
+      data = data.filter(function(x){ return x.id !== id; });
+      showToast("車両を削除しました");
+      render();
+    }).catch(function(err){ showToast("通信エラー: " + err.message, true); });
+  }
+
+  function moveVehicle(id, direction){
+    var rows = getFilteredData();
+    var idx = rows.findIndex(function(x){ return x.id === id; });
+    var targetIdx = idx + direction;
+    if(idx < 0 || targetIdx < 0 || targetIdx >= rows.length) return;
+    var a = rows[idx], b = rows[targetIdx];
+    var ia = data.indexOf(a), ib = data.indexOf(b);
+    data[ia] = b; data[ib] = a;
+    render();
+    apiPost("moveVehicle", { idA: a.id, idB: b.id }).catch(function(err){ showToast("並び替えの保存に失敗しました: " + err.message, true); });
+  }
+
+  function showToast(msg, isError){
+    el.toast.textContent = msg;
+    el.toast.classList.toggle('toast-error', !!isError);
+    el.toast.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(function(){ el.toast.classList.remove('show'); }, 2400);
+  }
+
+  // ---- export ----
+  function downloadFile(filename, content, mime){
+    var blob = new Blob([content], {type: mime});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function exportJson(){
+    var payload = {
+      exportedAt: new Date().toISOString(),
+      vehicles: data.map(function(v){
+        var c = Object.assign({}, v); delete c.id; delete c.sortOrder; return c;
+      })
+    };
+    downloadFile("車両管理データ_" + todayISO() + ".json", JSON.stringify(payload, null, 2), "application/json");
+    showToast("JSONファイルを出力しました");
+  }
+
+  function csvEscape(s){
+    s = String(s == null ? "" : s);
+    if(/[",\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+  function exportCsv(){
+    var headers = ["事業所","車種","ナンバー","所有者名義","初年度登録","経過年数","購入年月日","次回車検","リース満了日","夏タイヤサイズ","スタッドレスタイヤサイズ","備考"];
+    var lines = [headers.join(",")];
+    data.forEach(function(v){
+      var y = elapsedYears(v.first);
+      lines.push([v.office, v.type, (v.plate||"").replace(/\n/g," "), v.owner, v.first, (y == null ? "" : y+"年"), v.purchase, v.shaken, v.leaseEnd, v.summer, v.studless, v.note].map(csvEscape).join(","));
+    });
+    var csv = "﻿" + lines.join("\r\n");
+    downloadFile("車両管理データ_" + todayISO() + ".csv", csv, "text/csv");
+    showToast("CSVファイルを出力しました");
+  }
+
+  // ---- events ----
+  document.getElementById('btnAdd').addEventListener('click', addVehicle);
+  document.getElementById('btnReload').addEventListener('click', loadFromServer);
+
+  document.getElementById('btnAddOffice').addEventListener('click', addOffice);
+  el.newOfficeInput.addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ e.preventDefault(); addOffice(); }
+  });
+  el.officeCounts.addEventListener('click', function(e){
+    var btn = e.target.closest('button[data-action="remove-office"]');
+    if(btn) removeOffice(btn.getAttribute('data-office'));
+  });
+
+  document.getElementById('btnExportJson').addEventListener('click', exportJson);
+  document.getElementById('btnExportCsv').addEventListener('click', exportCsv);
+
+  // inline cell editing: update local model + badges live as the user types
+  el.tbody.addEventListener('input', function(e){
+    var input = e.target.closest('input[data-field]');
+    if(!input) return;
+    var id = Number(input.getAttribute('data-id'));
+    var field = input.getAttribute('data-field');
+    commitFieldLocal(id, field, input.value);
+    if(input.type === 'text'){
+      input.title = input.value;
+    }
+    if(field === 'shaken'){
+      var slot = el.tbody.querySelector('.badge-slot[data-badge-id="'+id+'"]');
+      if(slot) slot.innerHTML = shakenBadge(input.value);
+    }
+    if(field === 'first'){
+      var firstSlot = el.tbody.querySelector('.first-badge-slot[data-first-badge-id="'+id+'"]');
+      if(firstSlot) firstSlot.innerHTML = firstBadge(input.value);
+    }
+    if(field === 'leaseEnd' || field === 'owner'){
+      var rec = findRecord(id);
+      var leaseSlot = el.tbody.querySelector('.lease-badge-slot[data-lease-badge-id="'+id+'"]');
+      if(leaseSlot && rec) leaseSlot.innerHTML = leaseBadge(rec.leaseEnd, rec.owner);
+    }
+  });
+
+  // once the user leaves a cell (value actually changed): persist to the spreadsheet + refresh stats/offices
+  el.tbody.addEventListener('change', function(e){
+    var input = e.target.closest('input[data-field]');
+    if(!input) return;
+    var id = Number(input.getAttribute('data-id'));
+    var field = input.getAttribute('data-field');
+    syncField(id, field, input.value);
+    renderStats();
+    refreshOfficeOptions();
+  });
+
+  el.tbody.addEventListener('click', function(e){
+    var delBtn = e.target.closest('button[data-action="delete"]');
+    if(delBtn){ deleteVehicle(Number(delBtn.getAttribute('data-id'))); return; }
+    var upBtn = e.target.closest('button[data-action="up"]');
+    if(upBtn){ moveVehicle(Number(upBtn.getAttribute('data-id')), -1); return; }
+    var downBtn = e.target.closest('button[data-action="down"]');
+    if(downBtn){ moveVehicle(Number(downBtn.getAttribute('data-id')), 1); return; }
+  });
+
+  el.searchBox.addEventListener('input', render);
+  el.filterOffice.addEventListener('change', render);
+
+  loadConnection();
+  if(!isConfigured()){
+    render();
+    openSettings();
+  } else {
+    loadFromServer();
+  }
+})();
+</script>
+</body>
+</html>
