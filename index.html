@@ -107,7 +107,6 @@
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
     <span class="sync-status" id="syncStatus"><span class="sync-dot" id="syncDot"></span><span id="syncLabel">未接続</span></span>
-    <button class="btn-secondary" id="btnReload">🔄 再読み込み</button>
     <button class="btn-secondary" id="btnExportJson">⭳ データ出力 (JSON)</button>
     <button class="btn-secondary" id="btnExportCsv">⭳ CSV出力</button>
     <button class="btn-secondary" id="btnSettings">⚙ 接続設定</button>
@@ -179,7 +178,7 @@
     ※ リース満了日は所有者名義が「CENTO ANNI」の車両でのみ有効です（自社所有＝清流会名義の車両は「自社所有」と表示され、満了アラートの対象外になります）。<br>
     ※ 各行の▲▼ボタンで表示順を上下に入れ替えられます（検索・絞り込み中はその範囲内での並び替えになります）。<br>
     ※ 一覧表は閲覧専用です。内容を追加・変更するには、行の「✎ 編集」ボタン（新規追加は右上の「＋ 車両を追加」）からフォームを開いて入力してください。<br>
-    ※ 他の人が編集した内容を取り込むには「🔄 再読み込み」を押してください（起動時は自動で最新を取得します）。<br>
+    ※ 他の人が編集した内容は、起動時およびこの画面に戻ってきたとき（別タブ・別アプリから切り替えたとき）に自動で最新化されます。<br>
     ※「データ出力 (JSON)」「CSV出力」は、その時点の内容をバックアップとして手元に保存するためのものです（読み込み直接は行いません。復元が必要な場合はスプレッドシートを直接編集してください）。
   </div>
 </main>
@@ -747,7 +746,13 @@
 
   // ---- events ----
   document.getElementById('btnAdd').addEventListener('click', addVehicle);
-  document.getElementById('btnReload').addEventListener('click', loadFromServer);
+  // 他のタブ・アプリから戻ってきたとき（フォーカス復帰時）に自動で最新化する。
+  // 編集中の入力はモーダル内で閉じているため、一覧の裏側での更新に巻き込まれない。
+  window.addEventListener('focus', function(){
+    if(isConfigured() && el.vehicleOverlay.hidden){
+      loadFromServer();
+    }
+  });
 
   document.getElementById('btnAddOffice').addEventListener('click', addOffice);
   el.newOfficeInput.addEventListener('keydown', function(e){
