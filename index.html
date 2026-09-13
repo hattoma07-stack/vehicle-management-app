@@ -103,13 +103,13 @@
 <header>
   <div>
     <h1>🚗 車両管理アプリ</h1>
-    <div class="sub">事業所・車種・ナンバー・所有者名義・購入年月日・車検・リース満了日・タイヤサイズを一元管理（データはGoogleスプレッドシートで共有保存）</div>
+    <div class="sub">事業所・車種・ナンバー・所有者名義・購入年月日・車検・リース満了日・タイヤサイズを一元管理</div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-    <span class="sync-status" id="syncStatus"><span class="sync-dot" id="syncDot"></span><span id="syncLabel">未接続</span></span>
+    <span class="sync-status" id="syncStatus" hidden><span class="sync-dot" id="syncDot"></span><span id="syncLabel"></span></span>
     <button class="btn-secondary" id="btnExportJson">⭳ データ出力 (JSON)</button>
     <button class="btn-secondary" id="btnExportCsv">⭳ CSV出力</button>
-    <button class="btn-secondary" id="btnSettings">⚙ 接続設定</button>
+    <button class="btn-secondary" id="btnSettings" hidden>⚙ 接続設定</button>
     <button class="btn-primary" id="btnAdd">＋ 車両を追加</button>
   </div>
 </header>
@@ -172,14 +172,19 @@
   </div>
 
   <div class="hint">
-    ※ このアプリのデータは、あなたが設定したGoogleスプレッドシート（Google Apps Script経由）に保存されます。同じ接続設定（URL・合言葉）を使う端末同士でリアルタイムにデータを共有できます。<br>
     ※ 上部の「事業所を追加」から、車両がまだ無い事業所も先に登録できます（絞り込み・入力候補にすぐ反映されます）。事業所ごとの車両台数も同じ欄で確認できます。<br>
     ※ 初年度登録の下には登録からの経過年数を自動表示します（10年以上は黄、15年以上は赤で表示）。<br>
     ※ リース満了日は所有者名義が「CENTO ANNI」の車両でのみ有効です（自社所有＝清流会名義の車両は「自社所有」と表示され、満了アラートの対象外になります）。<br>
     ※ 各行の▲▼ボタンで表示順を上下に入れ替えられます（検索・絞り込み中はその範囲内での並び替えになります）。<br>
     ※ 一覧表は閲覧専用です。内容を追加・変更するには、行の「✎ 編集」ボタン（新規追加は右上の「＋ 車両を追加」）からフォームを開いて入力してください。<br>
     ※ 他の人が編集した内容は、起動時およびこの画面に戻ってきたとき（別タブ・別アプリから切り替えたとき）に自動で最新化されます。<br>
-    ※「データ出力 (JSON)」「CSV出力」は、その時点の内容をバックアップとして手元に保存するためのものです（読み込み直接は行いません。復元が必要な場合はスプレッドシートを直接編集してください）。
+    ※「データ出力 (JSON)」「CSV出力」は、その時点の内容をバックアップとして手元に保存するためのものです。
+  </div>
+  <div class="hint" id="adminHint" hidden>
+    【管理者向け】<br>
+    ※ このアプリのデータはGoogleスプレッドシート（Google Apps Script経由）に保存されます。同じ接続設定（URL・合言葉）を設定した端末同士でリアルタイムにデータを共有できます。設定手順は同梱の <code>GoogleAppsScript_Code.gs</code> と <code>README.md</code> を参照してください。<br>
+    ※ 誰が・いつ・何を変更したかは、スプレッドシートの「History」シートに自動記録されます。<br>
+    ※ この管理者向けメニュー（接続設定・同期状況）は、URLに <code>?admin=1</code> を付けたときだけ表示されます。事務の方に配布するURLには付けないでください。
   </div>
 </main>
 
@@ -192,6 +197,18 @@
 </datalist>
 
 <div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="nameOverlay" hidden>
+  <div class="modal">
+    <h2>ようこそ</h2>
+    <p>変更履歴に記録するため、はじめにお名前を入力してください。この端末では次回から表示されません。</p>
+    <label for="nameInput">お名前</label>
+    <input type="text" id="nameInput" placeholder="例: 山田 太郎">
+    <div class="modal-actions">
+      <button class="btn-primary" id="btnNameSave">はじめる</button>
+    </div>
+  </div>
+</div>
 
 <div class="modal-overlay" id="settingsOverlay" hidden>
   <div class="modal">
@@ -274,11 +291,14 @@
   "use strict";
 
   var STORAGE_KEY = "vehicleApp.connection";
+  var NAME_STORAGE_KEY = "vehicleApp.actorName";
+  var isAdminMode = new URLSearchParams(location.search).get('admin') === '1';
 
   var data = [];
   var manualOffices = [];
   var justAddedId = null;
   var conn = { url: "", token: "" };
+  var actorName = "";
 
   var el = {
     tbody: document.getElementById('tbody'),
@@ -294,6 +314,11 @@
     footerDate: document.getElementById('footerDate'),
     syncDot: document.getElementById('syncDot'),
     syncLabel: document.getElementById('syncLabel'),
+    syncStatus: document.getElementById('syncStatus'),
+    btnSettings: document.getElementById('btnSettings'),
+    adminHint: document.getElementById('adminHint'),
+    nameOverlay: document.getElementById('nameOverlay'),
+    nameInput: document.getElementById('nameInput'),
     settingsOverlay: document.getElementById('settingsOverlay'),
     settingsUrl: document.getElementById('settingsUrl'),
     settingsToken: document.getElementById('settingsToken'),
@@ -320,7 +345,7 @@
   }
   el.footerDate.textContent = todayISO();
 
-  // ---- connection settings (stored locally per-browser) ----
+  // ---- connection settings (stored locally per-browser, admin-only UI) ----
   function loadConnection(){
     try{
       var raw = localStorage.getItem(STORAGE_KEY);
@@ -359,7 +384,33 @@
     loadFromServer();
   });
 
-  // ---- sync status indicator ----
+  // ---- actor name (for history logging; not shown to the app's normal users as a "login") ----
+  function loadActorName(){
+    try{ actorName = localStorage.getItem(NAME_STORAGE_KEY) || ""; }catch(err){ actorName = ""; }
+  }
+  function ensureActorName(callback){
+    if(actorName){ callback(); return; }
+    el.nameOverlay.hidden = false;
+    el.nameInput.focus();
+    var handler = function(){
+      var name = el.nameInput.value.trim();
+      if(!name){ showToast("お名前を入力してください", true); return; }
+      actorName = name;
+      try{ localStorage.setItem(NAME_STORAGE_KEY, actorName); }catch(err){ /* storage unavailable */ }
+      el.nameOverlay.hidden = true;
+      document.getElementById('btnNameSave').removeEventListener('click', handler);
+      callback();
+    };
+    document.getElementById('btnNameSave').addEventListener('click', handler);
+  }
+  function deviceLabel(){
+    var ua = navigator.userAgent;
+    var browser = /Edg\//.test(ua) ? "Edge" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : /Firefox\//.test(ua) ? "Firefox" : "不明";
+    var os = /iPad/.test(ua) ? "iPad" : /iPhone/.test(ua) ? "iPhone" : /Android/.test(ua) ? "Android" : /Mac OS X/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : "不明";
+    return browser + " / " + os;
+  }
+
+  // ---- sync status indicator (admin only) ----
   function setSyncStatus(state, label){
     el.syncDot.className = "sync-dot" + (state ? " " + state : "");
     el.syncLabel.textContent = label;
@@ -371,16 +422,17 @@
     return fetch(url, { method: "GET" }).then(function(res){ return res.json(); });
   }
   function apiPost(action, payload){
+    var body = Object.assign({ actorName: actorName, device: deviceLabel() }, payload || {});
     return fetch(conn.url, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ token: conn.token, action: action, payload: payload || {} })
+      body: JSON.stringify({ token: conn.token, action: action, payload: body })
     }).then(function(res){ return res.json(); });
   }
 
   function loadFromServer(){
     if(!isConfigured()){
-      setSyncStatus("", "未接続（右上の「接続設定」から設定してください）");
+      setSyncStatus("", "未接続");
       data = [];
       manualOffices = [];
       render();
@@ -389,8 +441,8 @@
     setSyncStatus("busy", "読み込み中…");
     apiGet().then(function(res){
       if(!res || !res.ok){
-        setSyncStatus("error", "接続エラー: " + (res && res.error ? res.error : "unknown"));
-        showToast("スプレッドシートへの接続に失敗しました", true);
+        setSyncStatus("error", "エラー: " + (res && res.error ? res.error : "unknown"));
+        showToast("データの読み込みに失敗しました。時間をおいて再度お試しください", true);
         return;
       }
       data = res.vehicles || [];
@@ -398,8 +450,8 @@
       setSyncStatus("ok", "接続済み（" + data.length + "件）");
       render();
     }).catch(function(err){
-      setSyncStatus("error", "接続エラー");
-      showToast("スプレッドシートへの接続に失敗しました: " + err.message, true);
+      setSyncStatus("error", "エラー");
+      showToast("データの読み込みに失敗しました。時間をおいて再度お試しください", true);
     });
   }
 
@@ -490,7 +542,7 @@
   }
 
   function addOffice(){
-    if(!isConfigured()){ showToast("先に接続設定をしてください", true); return; }
+    if(!isConfigured()){ showToast("只今ご利用いただけません。管理者にご連絡ください。", true); return; }
     var name = el.newOfficeInput.value.trim();
     if(!name){ showToast("事業所名を入力してください", true); return; }
     if(uniqueOffices().indexOf(name) >= 0){ showToast("その事業所は既に登録されています", true); return; }
@@ -559,7 +611,9 @@
     if(!isConfigured()){
       el.tbody.innerHTML = "";
       el.emptyState.style.display = "block";
-      el.emptyState.textContent = "右上の「⚙ 接続設定」からGoogleスプレッドシートの接続情報を入力してください";
+      el.emptyState.textContent = isAdminMode
+        ? "右上の「⚙ 接続設定」から接続情報を入力してください"
+        : "只今ご利用いただけません。管理者にご連絡ください。";
       el.countLabel.textContent = "";
       return;
     }
@@ -635,7 +689,7 @@
   }
 
   function addVehicle(){
-    if(!isConfigured()){ showToast("先に接続設定をしてください", true); return; }
+    if(!isConfigured()){ showToast("只今ご利用いただけません。管理者にご連絡ください。", true); return; }
     openVehicleModal("add", null);
   }
 
@@ -784,12 +838,22 @@
   el.filterOffice.addEventListener('change', render);
 
   loadConnection();
-  if(!isConfigured()){
-    render();
-    openSettings();
-  } else {
-    loadFromServer();
+  loadActorName();
+
+  if(isAdminMode){
+    el.btnSettings.hidden = false;
+    el.syncStatus.hidden = false;
+    el.adminHint.hidden = false;
   }
+
+  ensureActorName(function(){
+    if(!isConfigured()){
+      render();
+      if(isAdminMode) openSettings();
+      return;
+    }
+    loadFromServer();
+  });
 })();
 </script>
 </body>

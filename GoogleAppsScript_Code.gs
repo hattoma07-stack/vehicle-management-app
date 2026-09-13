@@ -32,10 +32,19 @@
  * 【複数人での同時利用について】
  * 書き込み処理はすべて LockService でロックしてから行うため、
  * 複数人が同時に編集しても行が壊れたり重複したりしません。
+ *
+ * 【変更履歴について】
+ * 追加・編集・削除・事業所の追加/削除のたびに、スプレッドシート内の
+ * 「History」シートに「日時・操作・担当者・端末・対象・詳細」が自動で
+ * 記録されます（担当者名はアプリ初回起動時に本人が入力したもの、
+ * 本人確認まではしていない自己申告です）。管理者はこのシートを直接
+ * 開くことで、いつ誰が何を変更したかを確認できます。
  */
 
 const VEHICLE_SHEET_NAME = "Vehicles";
 const OFFICE_SHEET_NAME = "Offices";
+const HISTORY_SHEET_NAME = "History";
+const HISTORY_FIELDS = ["日時", "操作", "担当者", "端末", "対象", "詳細"];
 
 // APIトークン（合言葉）。この値と一致しないリクエストは拒否します。
 // index.html の設定パネルで入力する値と必ず同じにしてください。
@@ -81,6 +90,43 @@ function getOfficeSheet_() {
   return sh;
 }
 
+function getHistorySheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(HISTORY_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(HISTORY_SHEET_NAME);
+    sh.appendRow(HISTORY_FIELDS);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+// 追加・編集・削除のたびに「いつ・誰が・どの端末で・何を」を記録する
+function logHistory_(action, actorName, device, target, details) {
+  const sh = getHistorySheet_();
+  sh.appendRow([new Date(), action, actorName || "(未入力)", device || "", target || "", details || ""]);
+  SpreadsheetApp.flush();
+}
+
+function vehicleLabel_(v) {
+  if (!v) return "";
+  return [v.office, v.type, (v.plate || "").replace(/\n/g, " ")].filter(function (s) { return s; }).join(" / ");
+}
+
+// 編集前後の値を比較し、変更されたフィールドだけを「項目: 旧→新」の形式にまとめる
+function diffText_(before, after) {
+  const editableFields = VEHICLE_FIELDS.filter(function (f) { return f !== "id" && f !== "sortOrder"; });
+  const diffs = [];
+  editableFields.forEach(function (f) {
+    const oldVal = (before && before[f]) || "";
+    const newVal = (after && after[f]) || "";
+    if (String(oldVal) !== String(newVal)) {
+      diffs.push(f + ": " + (oldVal || "(空欄)") + " → " + (newVal || "(空欄)"));
+    }
+  });
+  return diffs.join("; ");
+}
+
 function readVehicles_() {
   const sh = getVehicleSheet_();
   const values = sh.getDataRange().getValues();
@@ -119,6 +165,14 @@ function readOffices_() {
     if (values[i][0]) names.push(String(values[i][0]));
   }
   return names;
+}
+
+function getVehicleById_(id) {
+  const rows = readVehicles_();
+  for (let i = 0; i < rows.length; i++) {
+    if (Number(rows[i].id) === Number(id)) return rows[i];
+  }
+  return null;
 }
 
 function findVehicleRow_(sh, id) {
@@ -170,7 +224,7 @@ function doGet(e) {
 }
 
 // ---- POST: 追加・編集・削除・並び替え・事業所管理 ----
-// body: { token, action, payload }
+// body: { token, action, payload: {..., actorName, device} }
 function doPost(e) {
   try {
     const body = JSON.parse(e.postData.contents);
@@ -179,21 +233,56 @@ function doPost(e) {
 
     const action = body.action;
     const payload = body.payload || {};
+    const actorName = payload.actorName || "";
+    const device = payload.device || "";
 
     const lock = LockService.getScriptLock();
     lock.waitLock(10000);
     try {
+      let result;
       switch (action) {
-        case "addVehicle": return jsonOut_(addVehicle_(payload));
-        case "updateVehicle": return jsonOut_(updateVehicle_(payload));
-        case "updateField": return jsonOut_(updateField_(payload));
-        case "deleteVehicle": return jsonOut_(deleteVehicle_(payload));
-        case "moveVehicle": return jsonOut_(moveVehicle_(payload));
-        case "addOffice": return jsonOut_(addOffice_(payload));
-        case "removeOffice": return jsonOut_(removeOffice_(payload));
-        case "seedIfEmpty": return jsonOut_(seedIfEmptyInternal_());
-        default: return { ok: false, error: "unknown action: " + action };
+        case "addVehicle": {
+          result = addVehicle_(payload);
+          if (result.ok) logHistory_("追加", actorName, device, vehicleLabel_(result.vehicle), "");
+          break;
+        }
+        case "updateVehicle": {
+          const before = getVehicleById_(payload.id);
+          result = updateVehicle_(payload);
+          if (result.ok) {
+            logHistory_("編集", actorName, device, vehicleLabel_(Object.assign({}, before, payload)), diffText_(before, payload));
+          }
+          break;
+        }
+        case "deleteVehicle": {
+          const before = getVehicleById_(payload.id);
+          result = deleteVehicle_(payload);
+          if (result.ok && before) logHistory_("削除", actorName, device, vehicleLabel_(before), "");
+          break;
+        }
+        case "moveVehicle": {
+          result = moveVehicle_(payload);
+          break;
+        }
+        case "addOffice": {
+          result = addOffice_(payload);
+          if (result.ok) logHistory_("事業所追加", actorName, device, payload.name, "");
+          break;
+        }
+        case "removeOffice": {
+          result = removeOffice_(payload);
+          if (result.ok) logHistory_("事業所削除", actorName, device, payload.name, "");
+          break;
+        }
+        case "seedIfEmpty": {
+          result = seedIfEmptyInternal_();
+          break;
+        }
+        default: {
+          result = { ok: false, error: "unknown action: " + action };
+        }
       }
+      return jsonOut_(result);
     } finally {
       lock.releaseLock();
     }
@@ -227,19 +316,6 @@ function updateVehicle_(payload) {
   const values = editableFields.map(function (f) { return payload[f] || ""; });
   const firstCol = VEHICLE_FIELDS.indexOf(editableFields[0]) + 1;
   sh.getRange(rowIndex, firstCol, 1, editableFields.length).setValues([values]);
-  SpreadsheetApp.flush();
-  return { ok: true };
-}
-
-function updateField_(payload) {
-  const sh = getVehicleSheet_();
-  const rowIndex = findVehicleRow_(sh, payload.id);
-  if (rowIndex < 0) return { ok: false, error: "vehicle not found" };
-  const colIndex = VEHICLE_FIELDS.indexOf(payload.field);
-  if (colIndex < 0 || payload.field === "id" || payload.field === "sortOrder") {
-    return { ok: false, error: "invalid field" };
-  }
-  sh.getRange(rowIndex, colIndex + 1).setValue(payload.value);
   SpreadsheetApp.flush();
   return { ok: true };
 }
