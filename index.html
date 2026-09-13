@@ -46,12 +46,11 @@
   .move-btn:disabled{opacity:.3;cursor:default;}
   .move-btn:disabled:hover{opacity:.3;}
   .empty{padding:60px 20px;text-align:center;color:var(--sub);}
-  .cell-input{width:100%;box-sizing:border-box;padding:5px 5px;border:1px solid transparent;border-radius:6px;font-size:12px;font-family:inherit;background:transparent;color:inherit;overflow:hidden;text-overflow:ellipsis;}
-  .cell-input:hover{border-color:var(--border);background:#fff;}
-  .cell-input:focus{border-color:var(--accent);background:#fff;outline:none;box-shadow:0 0 0 3px rgba(37,99,235,.12);}
-  input[type=date].cell-input{padding-left:3px;padding-right:2px;font-size:11px;}
+  .cell-text{display:block;padding:5px;font-size:12px;line-height:1.4;word-break:break-word;white-space:normal;}
+  .cell-text.muted{color:var(--sub);}
   .stack-col{display:flex;flex-direction:column;gap:3px;min-width:0;}
   .stack-col .badge{width:fit-content;max-width:100%;}
+  .edit-btn{padding:4px 8px;font-size:11px;background:#fff;color:var(--accent);border:1px solid var(--border);}
   .new-row{animation:flash 1s ease;}
   @keyframes flash{0%{background:#dbeafe;}100%{background:transparent;}}
   .office-card{padding:16px 18px;margin-bottom:16px;}
@@ -85,9 +84,15 @@
   .modal label{display:block;font-size:12px;font-weight:600;margin:12px 0 6px;}
   .modal input[type=text]{width:100%;}
   .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;}
+  .modal-wide{max-width:640px;}
   .disabled-overlay{padding:60px 20px;text-align:center;color:var(--sub);}
+  .vform-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;}
+  .vform-grid .full{grid-column:1 / -1;}
+  .vform-grid label{display:block;font-size:12px;font-weight:600;margin:0 0 6px;}
+  .vform-grid input[type=text], .vform-grid input[type=date]{width:100%;}
   @media (max-width:700px){
     .form-grid{grid-template-columns:1fr;}
+    .vform-grid{grid-template-columns:1fr;}
     table{font-size:12px;}
     thead th, tbody td{padding:8px;}
   }
@@ -173,7 +178,7 @@
     ※ 初年度登録の下には登録からの経過年数を自動表示します（10年以上は黄、15年以上は赤で表示）。<br>
     ※ リース満了日は所有者名義が「CENTO ANNI」の車両でのみ有効です（自社所有＝清流会名義の車両は「自社所有」と表示され、満了アラートの対象外になります）。<br>
     ※ 各行の▲▼ボタンで表示順を上下に入れ替えられます（検索・絞り込み中はその範囲内での並び替えになります）。<br>
-    ※ 表の各セルをクリックすると直接編集できます（セルを離れると自動的にスプレッドシートへ保存されます）。<br>
+    ※ 一覧表は閲覧専用です。内容を追加・変更するには、行の「✎ 編集」ボタン（新規追加は右上の「＋ 車両を追加」）からフォームを開いて入力してください。<br>
     ※ 他の人が編集した内容を取り込むには「🔄 再読み込み」を押してください（起動時は自動で最新を取得します）。<br>
     ※「データ出力 (JSON)」「CSV出力」は、その時点の内容をバックアップとして手元に保存するためのものです（読み込み直接は行いません。復元が必要な場合はスプレッドシートを直接編集してください）。
   </div>
@@ -209,6 +214,62 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="vehicleOverlay" hidden>
+  <div class="modal modal-wide">
+    <h2 id="vehicleModalTitle">車両を追加</h2>
+    <div class="vform-grid">
+      <div>
+        <label for="vfOffice">事業所</label>
+        <input type="text" id="vfOffice" list="officeList" placeholder="事業所">
+      </div>
+      <div>
+        <label for="vfType">車種</label>
+        <input type="text" id="vfType" placeholder="車種">
+      </div>
+      <div>
+        <label for="vfPlate">ナンバー</label>
+        <input type="text" id="vfPlate" placeholder="ナンバー">
+      </div>
+      <div>
+        <label for="vfOwner">所有者名義</label>
+        <input type="text" id="vfOwner" list="ownerList" placeholder="所有者名義">
+      </div>
+      <div>
+        <label for="vfFirst">初年度登録</label>
+        <input type="date" id="vfFirst">
+      </div>
+      <div>
+        <label for="vfPurchase">購入年月日</label>
+        <input type="date" id="vfPurchase">
+      </div>
+      <div>
+        <label for="vfShaken">次回車検</label>
+        <input type="date" id="vfShaken">
+      </div>
+      <div>
+        <label for="vfLeaseEnd">リース満了日（CENTO ANNI名義のみ）</label>
+        <input type="date" id="vfLeaseEnd">
+      </div>
+      <div>
+        <label for="vfSummer">夏タイヤサイズ</label>
+        <input type="text" id="vfSummer" placeholder="—">
+      </div>
+      <div>
+        <label for="vfStudless">スタッドレスタイヤサイズ</label>
+        <input type="text" id="vfStudless" placeholder="—">
+      </div>
+      <div class="full">
+        <label for="vfNote">備考</label>
+        <input type="text" id="vfNote" placeholder="—">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="btnVehicleCancel">キャンセル</button>
+      <button class="btn-primary" id="btnVehicleSave">保存</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   "use strict";
@@ -236,8 +297,23 @@
     syncLabel: document.getElementById('syncLabel'),
     settingsOverlay: document.getElementById('settingsOverlay'),
     settingsUrl: document.getElementById('settingsUrl'),
-    settingsToken: document.getElementById('settingsToken')
+    settingsToken: document.getElementById('settingsToken'),
+    vehicleOverlay: document.getElementById('vehicleOverlay'),
+    vehicleModalTitle: document.getElementById('vehicleModalTitle'),
+    vfOffice: document.getElementById('vfOffice'),
+    vfType: document.getElementById('vfType'),
+    vfPlate: document.getElementById('vfPlate'),
+    vfOwner: document.getElementById('vfOwner'),
+    vfFirst: document.getElementById('vfFirst'),
+    vfPurchase: document.getElementById('vfPurchase'),
+    vfShaken: document.getElementById('vfShaken'),
+    vfLeaseEnd: document.getElementById('vfLeaseEnd'),
+    vfSummer: document.getElementById('vfSummer'),
+    vfStudless: document.getElementById('vfStudless'),
+    vfNote: document.getElementById('vfNote')
   };
+  var vehicleModalMode = "add";
+  var vehicleModalId = null;
 
   function todayISO(){
     var d = new Date();
@@ -495,32 +571,33 @@
     el.emptyState.style.display = rows.length ? "none" : "block";
     el.emptyState.textContent = "該当する車両がありません";
 
+    function textCell(v){ return v ? escapeHtml(v) : '<span class="cell-text muted">—</span>'; }
+
     el.tbody.innerHTML = rows.map(function(v, i){
       var rowClass = (v.id === justAddedId) ? ' class="new-row"' : '';
       var isFirst = i === 0;
       var isLast = i === rows.length - 1;
       return '<tr data-id="'+v.id+'"'+rowClass+'>' +
-        '<td><input class="cell-input" type="text" data-field="office" data-id="'+v.id+'" value="'+escapeHtml(v.office)+'" title="'+escapeHtml(v.office)+'" list="officeList" placeholder="事業所"></td>' +
-        '<td><input class="cell-input" type="text" data-field="type" data-id="'+v.id+'" value="'+escapeHtml(v.type)+'" title="'+escapeHtml(v.type)+'" placeholder="車種"></td>' +
-        '<td class="plate-cell"><input class="cell-input" type="text" data-field="plate" data-id="'+v.id+'" value="'+escapeHtml((v.plate||"").replace(/\n/g," "))+'" title="'+escapeHtml((v.plate||"").replace(/\n/g," "))+'" placeholder="ナンバー"></td>' +
-        '<td class="owner-cell"><input class="cell-input" type="text" data-field="owner" data-id="'+v.id+'" value="'+escapeHtml(v.owner)+'" title="'+escapeHtml(v.owner)+'" list="ownerList" placeholder="所有者名義"></td>' +
+        '<td><span class="cell-text">'+textCell(v.office)+'</span></td>' +
+        '<td><span class="cell-text">'+textCell(v.type)+'</span></td>' +
+        '<td><span class="cell-text">'+textCell((v.plate||"").replace(/\n/g," "))+'</span></td>' +
+        '<td><span class="cell-text">'+textCell(v.owner)+'</span></td>' +
         '<td class="date-cell"><div class="stack-col">' +
-          '<input class="cell-input" type="date" data-field="first" data-id="'+v.id+'" value="'+escapeHtml(v.first)+'">' +
-          '<span class="first-badge-slot" data-first-badge-id="'+v.id+'">'+firstBadge(v.first)+'</span>' +
+          '<span class="cell-text">'+textCell(v.first)+'</span>' +
+          firstBadge(v.first) +
         '</div></td>' +
-        '<td class="date-cell"><input class="cell-input" type="date" data-field="purchase" data-id="'+v.id+'" value="'+escapeHtml(v.purchase)+'"></td>' +
+        '<td><span class="cell-text">'+textCell(v.purchase)+'</span></td>' +
         '<td class="shaken-cell"><div class="stack-col">' +
-          '<input class="cell-input" type="date" data-field="shaken" data-id="'+v.id+'" value="'+escapeHtml(v.shaken)+'">' +
-          '<span class="badge-slot" data-badge-id="'+v.id+'">'+shakenBadge(v.shaken)+'</span>' +
+          shakenBadge(v.shaken) +
         '</div></td>' +
         '<td class="lease-cell"><div class="stack-col">' +
-          '<input class="cell-input" type="date" data-field="leaseEnd" data-id="'+v.id+'" value="'+escapeHtml(v.leaseEnd)+'">' +
-          '<span class="lease-badge-slot" data-lease-badge-id="'+v.id+'">'+leaseBadge(v.leaseEnd, v.owner)+'</span>' +
+          leaseBadge(v.leaseEnd, v.owner) +
         '</div></td>' +
-        '<td><input class="cell-input" type="text" data-field="summer" data-id="'+v.id+'" value="'+escapeHtml(v.summer)+'" placeholder="—"></td>' +
-        '<td><input class="cell-input" type="text" data-field="studless" data-id="'+v.id+'" value="'+escapeHtml(v.studless)+'" placeholder="—"></td>' +
-        '<td><input class="cell-input" type="text" data-field="note" data-id="'+v.id+'" value="'+escapeHtml(v.note)+'" placeholder="—"></td>' +
+        '<td><span class="cell-text">'+textCell(v.summer)+'</span></td>' +
+        '<td><span class="cell-text">'+textCell(v.studless)+'</span></td>' +
+        '<td><span class="cell-text">'+textCell(v.note)+'</span></td>' +
         '<td class="actions-cell">' +
+          '<button class="edit-btn" data-action="edit" data-id="'+v.id+'" title="編集">✎ 編集</button>' +
           '<button class="move-btn" data-action="up" data-id="'+v.id+'" title="上へ移動"'+(isFirst?' disabled':'')+'>▲</button>' +
           '<button class="move-btn" data-action="down" data-id="'+v.id+'" title="下へ移動"'+(isLast?' disabled':'')+'>▼</button>' +
           '<button class="btn-danger" data-action="delete" data-id="'+v.id+'" title="削除">🗑</button>' +
@@ -534,32 +611,67 @@
     return data.find(function(x){ return x.id === id; });
   }
 
-  function commitFieldLocal(id, field, value){
-    var rec = findRecord(id);
-    if(!rec) return;
-    rec[field] = value;
-  }
+  // ---- add/edit modal ----
+  var VEHICLE_FORM_FIELDS = ["office","type","plate","owner","first","purchase","shaken","leaseEnd","summer","studless","note"];
 
-  function syncField(id, field, value){
-    apiPost("updateField", { id: id, field: field, value: value }).then(function(res){
-      if(!res || !res.ok){ showToast("保存に失敗しました（" + field + "）", true); }
-    }).catch(function(err){ showToast("通信エラー: " + err.message, true); });
+  function openVehicleModal(mode, vehicle){
+    vehicleModalMode = mode;
+    vehicleModalId = vehicle ? vehicle.id : null;
+    el.vehicleModalTitle.textContent = mode === "edit" ? "車両を編集" : "車両を追加";
+    VEHICLE_FORM_FIELDS.forEach(function(f){
+      el["vf" + f.charAt(0).toUpperCase() + f.slice(1)].value = (vehicle && vehicle[f]) ? vehicle[f].replace(/\n/g," ") : "";
+    });
+    el.vehicleOverlay.hidden = false;
+    el.vfOffice.focus();
+  }
+  function closeVehicleModal(){
+    el.vehicleOverlay.hidden = true;
+  }
+  function collectVehicleForm(){
+    var obj = {};
+    VEHICLE_FORM_FIELDS.forEach(function(f){
+      obj[f] = el["vf" + f.charAt(0).toUpperCase() + f.slice(1)].value.trim();
+    });
+    return obj;
   }
 
   function addVehicle(){
     if(!isConfigured()){ showToast("先に接続設定をしてください", true); return; }
-    showToast("追加しています…");
-    apiPost("addVehicle", {}).then(function(res){
-      if(!res || !res.ok || !res.vehicle){ showToast("車両の追加に失敗しました", true); return; }
-      data.push(res.vehicle);
-      justAddedId = res.vehicle.id;
-      el.searchBox.value = "";
-      el.filterOffice.value = "";
-      render();
-      var firstInput = el.tbody.querySelector('input[data-field="office"][data-id="'+res.vehicle.id+'"]');
-      if(firstInput) firstInput.focus();
-      showToast("行を追加しました。セルに入力してください");
-    }).catch(function(err){ showToast("通信エラー: " + err.message, true); });
+    openVehicleModal("add", null);
+  }
+
+  function editVehicle(id){
+    var rec = findRecord(id);
+    if(!rec) return;
+    openVehicleModal("edit", rec);
+  }
+
+  function saveVehicleModal(){
+    var formData = collectVehicleForm();
+    if(!formData.office && !formData.type && !formData.plate){
+      showToast("事業所・車種・ナンバーのいずれかは入力してください", true);
+      return;
+    }
+    if(vehicleModalMode === "add"){
+      apiPost("addVehicle", formData).then(function(res){
+        if(!res || !res.ok || !res.vehicle){ showToast("車両の追加に失敗しました", true); return; }
+        data.push(res.vehicle);
+        justAddedId = res.vehicle.id;
+        closeVehicleModal();
+        render();
+        showToast("車両を追加しました");
+      }).catch(function(err){ showToast("通信エラー: " + err.message, true); });
+    } else {
+      var payload = Object.assign({ id: vehicleModalId }, formData);
+      apiPost("updateVehicle", payload).then(function(res){
+        if(!res || !res.ok){ showToast("保存に失敗しました", true); return; }
+        var rec = findRecord(vehicleModalId);
+        if(rec) Object.assign(rec, formData);
+        closeVehicleModal();
+        render();
+        showToast("保存しました");
+      }).catch(function(err){ showToast("通信エラー: " + err.message, true); });
+    }
   }
 
   function deleteVehicle(id){
@@ -649,43 +761,12 @@
   document.getElementById('btnExportJson').addEventListener('click', exportJson);
   document.getElementById('btnExportCsv').addEventListener('click', exportCsv);
 
-  // inline cell editing: update local model + badges live as the user types
-  el.tbody.addEventListener('input', function(e){
-    var input = e.target.closest('input[data-field]');
-    if(!input) return;
-    var id = Number(input.getAttribute('data-id'));
-    var field = input.getAttribute('data-field');
-    commitFieldLocal(id, field, input.value);
-    if(input.type === 'text'){
-      input.title = input.value;
-    }
-    if(field === 'shaken'){
-      var slot = el.tbody.querySelector('.badge-slot[data-badge-id="'+id+'"]');
-      if(slot) slot.innerHTML = shakenBadge(input.value);
-    }
-    if(field === 'first'){
-      var firstSlot = el.tbody.querySelector('.first-badge-slot[data-first-badge-id="'+id+'"]');
-      if(firstSlot) firstSlot.innerHTML = firstBadge(input.value);
-    }
-    if(field === 'leaseEnd' || field === 'owner'){
-      var rec = findRecord(id);
-      var leaseSlot = el.tbody.querySelector('.lease-badge-slot[data-lease-badge-id="'+id+'"]');
-      if(leaseSlot && rec) leaseSlot.innerHTML = leaseBadge(rec.leaseEnd, rec.owner);
-    }
-  });
-
-  // once the user leaves a cell (value actually changed): persist to the spreadsheet + refresh stats/offices
-  el.tbody.addEventListener('change', function(e){
-    var input = e.target.closest('input[data-field]');
-    if(!input) return;
-    var id = Number(input.getAttribute('data-id'));
-    var field = input.getAttribute('data-field');
-    syncField(id, field, input.value);
-    renderStats();
-    refreshOfficeOptions();
-  });
+  document.getElementById('btnVehicleCancel').addEventListener('click', closeVehicleModal);
+  document.getElementById('btnVehicleSave').addEventListener('click', saveVehicleModal);
 
   el.tbody.addEventListener('click', function(e){
+    var editBtn = e.target.closest('button[data-action="edit"]');
+    if(editBtn){ editVehicle(Number(editBtn.getAttribute('data-id'))); return; }
     var delBtn = e.target.closest('button[data-action="delete"]');
     if(delBtn){ deleteVehicle(Number(delBtn.getAttribute('data-id'))); return; }
     var upBtn = e.target.closest('button[data-action="up"]');

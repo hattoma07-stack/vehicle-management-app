@@ -185,6 +185,7 @@ function doPost(e) {
     try {
       switch (action) {
         case "addVehicle": return jsonOut_(addVehicle_(payload));
+        case "updateVehicle": return jsonOut_(updateVehicle_(payload));
         case "updateField": return jsonOut_(updateField_(payload));
         case "deleteVehicle": return jsonOut_(deleteVehicle_(payload));
         case "moveVehicle": return jsonOut_(moveVehicle_(payload));
@@ -215,6 +216,19 @@ function addVehicle_(payload) {
   const vehicle = {};
   VEHICLE_FIELDS.forEach(function (f, idx) { vehicle[f] = row[idx]; });
   return { ok: true, vehicle: vehicle };
+}
+
+// 入力フォームからの一括更新: id以外の全項目をまとめて上書きする
+function updateVehicle_(payload) {
+  const sh = getVehicleSheet_();
+  const rowIndex = findVehicleRow_(sh, payload.id);
+  if (rowIndex < 0) return { ok: false, error: "vehicle not found" };
+  const editableFields = VEHICLE_FIELDS.filter(function (f) { return f !== "id" && f !== "sortOrder"; });
+  const values = editableFields.map(function (f) { return payload[f] || ""; });
+  const firstCol = VEHICLE_FIELDS.indexOf(editableFields[0]) + 1;
+  sh.getRange(rowIndex, firstCol, 1, editableFields.length).setValues([values]);
+  SpreadsheetApp.flush();
+  return { ok: true };
 }
 
 function updateField_(payload) {
